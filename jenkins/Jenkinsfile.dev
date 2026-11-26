@@ -1,0 +1,143 @@
+// Pipeline 2 - FULL BUILD on push to branch "dev"
+// Unit tests + Docker build for 2 Python runtimes IN PARALLEL, run, smoke test.
+
+def report(String line) {
+  sh "mkdir -p reports && echo '${line}' >> reports/pipeline-report.txt"
+}
+
+def buildImage(String py) {
+  def t = py.replace('.', '')
+  sh """
+    echo "===== Unit tests + image build : Python ${py} ====="
+    docker build --build-arg PYTHON_VERSION=${py} --target test \
+      -t \$APP:test-\$CI_ID-py${t} . > reports/build-py${py}.log 2>&1 \
+    && docker build --build-arg PYTHON_VERSION=${py} --build-arg APP_VERSION=\$APP_VERSION \
+      --target runtime -t \$APP:\$CI_ID-py${t} . >> reports/build-py${py}.log 2>&1
+    STATUS=\$?
+    cat reports/build-py${py}.log
+    exit \$STATUS
+  """
+}
+
+def runContainer(String py) {
+  def t = py.replace('.', '')
+  sh "docker run -d --name \$APP-\$CI_ID-py${t} \$APP:\$CI_ID-py${t}"
+}
+
+def smoke(String py) {
+  def t = py.replace('.', '')
+  sh "bash scripts/smoke_test.sh \$APP-\$CI_ID-py${t} reports/smoke-py${py}.txt"
+}
+
+def cleanup() {
+  // Removes only the containers/images of THIS build (exact names).
+  sh '''
+    if [ -z "$CI_ID" ]; then echo "Nothing to clean"; exit 0; fi
+    for T in 311 312; do
+      docker rm -f "$APP-$CI_ID-py$T" >/dev/null 2>&1 || true
+      docker rmi -f "$APP:$CI_ID-py$T" "$APP:test-$CI_ID-py$T" >/dev/null 2>&1 || true
+    done
+    echo "Cleanup done for $CI_ID"
+  '''
+}
+
+pipeline {
+  agent any
+  options {
+    timestamps()
+    timeout(time: 20, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    disableConcurrentBuilds()
+  }
+  environment {
+    APP = 'task-api'
+    DOCKER_BUILDKIT = '1'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        sh '''
+          rm -rf reports dist && mkdir -p reports
+          echo "PIPELINE REPORT - Full build (dev)" > reports/pipeline-report.txt
+          echo "Job: $JOB_NAME  Build: #$BUILD_NUMBER  Commit: $(git rev-parse --short HEAD)" >> reports/pipeline-report.txt
+          echo "----------------------------------------" >> reports/pipeline-report.txt
+          git log -1 --pretty="Commit %h by %an : %s"
+        '''
+      }
+      post { success { report('Checkout: PASSED') } failure { report('Checkout: FAILED') } }
+    }
+
+    stage('Setup') {
+      steps {
+        script {
+          env.CI_ID = "dev-${env.BUILD_NUMBER}"
+          env.APP_VERSION = env.CI_ID
+        }
+        sh '''
+          docker version --format "Docker client {{.Client.Version}} / server {{.Server.Version}}"
+        '''
+      }
+      post { success { report('Setup: PASSED') } failure { report('Setup: FAILED') } }
+    }
+
+    stage('Build') {
+      parallel {
+        stage('Build Python 3.11') {
+          steps { buildImage('3.11') }
+          post { success { report('Build py3.11: PASSED') } failure { report('Build py3.11: FAILED') } }
+        }
+        stage('Build Python 3.12') {
+          steps { buildImage('3.12') }
+          post { success { report('Build py3.12: PASSED') } failure { report('Build py3.12: FAILED') } }
+        }
+      }
+    }
+
+    stage('Run (Docker)') {
+      parallel {
+        stage('Run Python 3.11') {
+          steps { runContainer('3.11') }
+          post { success { report('Run py3.11: PASSED') } failure { report('Run py3.11: FAILED') } }
+        }
+        stage('Run Python 3.12') {
+          steps { runContainer('3.12') }
+          post { success { report('Run py3.12: PASSED') } failure { report('Run py3.12: FAILED') } }
+        }
+      }
+    }
+
+    stage('Smoke Test') {
+      parallel {
+        stage('Smoke Python 3.11') {
+          steps { smoke('3.11') }
+          post { success { report('Smoke py3.11: PASSED') } failure { report('Smoke py3.11: FAILED') } }
+        }
+        stage('Smoke Python 3.12') {
+          steps { smoke('3.12') }
+          post { success { report('Smoke py3.12: PASSED') } failure { report('Smoke py3.12: FAILED') } }
+        }
+      }
+    }
+
+    stage('Archive Artifacts') {
+      steps {
+        report('Archive Artifacts: PASSED')
+        archiveArtifacts artifacts: 'reports/**', fingerprint: true
+      }
+    }
+
+    stage('Cleanup') {
+      steps { cleanup() }
+    }
+  }
+
+  post {
+    always {
+      report("FINAL RESULT: ${currentBuild.currentResult} (stages not listed = SKIPPED)")
+      archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
+      cleanup()
+    }
+  }
+}
