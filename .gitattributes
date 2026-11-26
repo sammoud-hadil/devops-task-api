@@ -1,0 +1,6 @@
+# Force Linux line endings so scripts run inside Jenkins/Docker even if
+# the code is edited on Windows.
+* text=auto eol=lf
+*.sh text eol=lf
+Jenkinsfile* text eol=lf
+Dockerfile text eol=lf
