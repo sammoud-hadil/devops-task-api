@@ -1,0 +1,7 @@
+workflow-aggregator
+git
+github-branch-source
+pipeline-stage-view
+pipeline-graph-view
+timestamper
+basic-branch-build-strategies
