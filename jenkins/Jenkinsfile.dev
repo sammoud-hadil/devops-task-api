@@ -66,7 +66,10 @@ pipeline {
           git log -1 --pretty="Commit %h by %an : %s"
         '''
       }
-      post { success { report('Checkout: PASSED') } failure { report('Checkout: FAILED') } }
+      post {
+        success { report('Checkout: PASSED') }
+        failure { report('Checkout: FAILED') }
+      }
     }
 
     stage('Setup') {
@@ -79,18 +82,27 @@ pipeline {
           docker version --format "Docker client {{.Client.Version}} / server {{.Server.Version}}"
         '''
       }
-      post { success { report('Setup: PASSED') } failure { report('Setup: FAILED') } }
+      post {
+        success { report('Setup: PASSED') }
+        failure { report('Setup: FAILED') }
+      }
     }
 
     stage('Build') {
       parallel {
         stage('Build Python 3.11') {
           steps { buildImage('3.11') }
-          post { success { report('Build py3.11: PASSED') } failure { report('Build py3.11: FAILED') } }
+          post {
+            success { report('Build py3.11: PASSED') }
+            failure { report('Build py3.11: FAILED') }
+          }
         }
         stage('Build Python 3.12') {
           steps { buildImage('3.12') }
-          post { success { report('Build py3.12: PASSED') } failure { report('Build py3.12: FAILED') } }
+          post {
+            success { report('Build py3.12: PASSED') }
+            failure { report('Build py3.12: FAILED') }
+          }
         }
       }
     }
@@ -99,11 +111,17 @@ pipeline {
       parallel {
         stage('Run Python 3.11') {
           steps { runContainer('3.11') }
-          post { success { report('Run py3.11: PASSED') } failure { report('Run py3.11: FAILED') } }
+          post {
+            success { report('Run py3.11: PASSED') }
+            failure { report('Run py3.11: FAILED') }
+          }
         }
         stage('Run Python 3.12') {
           steps { runContainer('3.12') }
-          post { success { report('Run py3.12: PASSED') } failure { report('Run py3.12: FAILED') } }
+          post {
+            success { report('Run py3.12: PASSED') }
+            failure { report('Run py3.12: FAILED') }
+          }
         }
       }
     }
@@ -112,11 +130,17 @@ pipeline {
       parallel {
         stage('Smoke Python 3.11') {
           steps { smoke('3.11') }
-          post { success { report('Smoke py3.11: PASSED') } failure { report('Smoke py3.11: FAILED') } }
+          post {
+            success { report('Smoke py3.11: PASSED') }
+            failure { report('Smoke py3.11: FAILED') }
+          }
         }
         stage('Smoke Python 3.12') {
           steps { smoke('3.12') }
-          post { success { report('Smoke py3.12: PASSED') } failure { report('Smoke py3.12: FAILED') } }
+          post {
+            success { report('Smoke py3.12: PASSED') }
+            failure { report('Smoke py3.12: FAILED') }
+          }
         }
       }
     }
