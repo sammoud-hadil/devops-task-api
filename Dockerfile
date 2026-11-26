@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels \
     && useradd --create-home appuser
 COPY app ./app
 USER appuser
-EXPOSE 5000
+EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "app.main:app"]
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "app.main:app"]
