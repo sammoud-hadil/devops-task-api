@@ -1,0 +1,10 @@
+.git
+.gitignore
+jenkins
+jenkins-server
+reports
+dist
+**/__pycache__
+**/*.pyc
+.pytest_cache
+README.md
